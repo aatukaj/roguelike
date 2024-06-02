@@ -1,31 +1,8 @@
-use std::iter;
-
 use glam::{ivec2, IVec2, UVec2};
-use hecs::Entity;
+use hecs::{Entity, World};
 use rand::random;
 
-pub fn parse_map(text: &str) -> Map {
-    let width = text.lines().next().unwrap().len();
-    let mut height = 0;
-    let mut tiles = vec![];
-    for line in text.lines() {
-        height += 1;
-        for c in line.chars() {
-            tiles.push(match c {
-                ' ' => Tile::Air,
-                '1' => Tile::Wall,
-                _ => panic!("Invalid map file char {c}"),
-            })
-        }
-        tiles.extend(iter::repeat(Tile::Air).take(width - line.len()))
-    }
-    Map {
-        width,
-        height,
-        tiles,
-        offset: ivec2(width as i32 / 2, height as i32 / 2),
-    }
-}
+use crate::{BlocksMoving, Name, Position, Renderable};
 
 pub struct Map {
     pub width: usize,
@@ -46,6 +23,23 @@ impl Map {
 
     pub fn grid(width: usize, height: usize, size: usize, world: &mut World) -> Self {
         let mut map = Self::new(width, height);
+
+        let mut spawn_helper = |x: usize, y: usize| {
+            if !map.tiles[x + width * y].is_empty() {
+                return;
+            }
+            let wall = world.spawn((
+                Renderable {
+                    char: '#',
+                    color: [255, 255, 255],
+                },
+                BlocksMoving,
+                Name("Wall"),
+                Position(ivec2(x as i32, y as i32) - map.offset),
+            ));
+            map.tiles[x + width * y].push(wall);
+        };
+
         for y in (0..height).step_by(size * 2 - 0) {
             for x in (0..width).step_by(size * 2 - 0) {
                 if random::<f32>() < 0.5 {
@@ -53,10 +47,10 @@ impl Map {
                 };
 
                 for i in 0..size {
-                    map.tiles[x + i + width * y] = Tile::Wall;
-                    map.tiles[x + width * (y + i)] = Tile::Wall;
-                    map.tiles[x + i + width * (y + size - 1)] = Tile::Wall;
-                    map.tiles[x + size - 1 + width * (y + i)] = Tile::Wall;
+                    spawn_helper(x + i, y);
+                    spawn_helper(x, y + i);
+                    spawn_helper(x + i, y + size - 1);
+                    spawn_helper(x + size - 1, y + i);
                 }
             }
         }

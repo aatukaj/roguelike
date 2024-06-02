@@ -1,4 +1,4 @@
-use crate::{Game, Renderable, Tile};
+use crate::{ControlState, Game, Renderable};
 use glam::{ivec2, u16vec2, IVec2, U16Vec2};
 use ratatui::prelude::*;
 
@@ -67,7 +67,6 @@ impl<'a> RenderContext<'a> {
         }
     }
     pub fn render(&mut self, state: &mut Game) {
-        eprintln!("safasd");
         for (_, (pos, rend)) in state.world.query_mut::<(&Position, &Renderable)>() {
             let [r, g, b] = rend.color;
             self.set_char(pos.0, rend.char, Style::default().fg(Color::Rgb(r, g, b)));
@@ -75,53 +74,18 @@ impl<'a> RenderContext<'a> {
 
         self.set_char(self.cam.top_left(), '#', Style::default());
         self.set_char(self.cam.bottom_right(), '#', Style::default());
-        self.render_walls(state);
-    }
-    fn render_walls(&mut self, state: &mut Game) {
-        let tl = self.cam.top_left();
-        let br = self.cam.bottom_right();
-        for y in tl.y..=br.y {
-            for x in tl.x..=br.x {
-                self.render_wall(ivec2(x, y), state);
-            }
+        if let ControlState::Selection(pos) = state.state {
+            self.set_char(
+                pos + ivec2(1, 0),
+                '<',
+                Style::default().fg(Color::Rgb(255, 196, 0)),
+            );
+            self.set_char(
+                pos - ivec2(1, 0),
+                '>',
+                Style::default().fg(Color::Rgb(255, 196, 0)),
+            )
         }
-    }
-
-    fn render_wall(&mut self, pos: IVec2, state: &mut Game) {
-        let tile = state.map.get_tile(pos);
-        if tile != &Tile::Wall {
-            return;
-        };
-        let l = state.map.get_tile(pos - ivec2(1, 0)) == &Tile::Wall;
-        let r = state.map.get_tile(pos + ivec2(1, 0)) == &Tile::Wall;
-        let u = state.map.get_tile(pos - ivec2(0, 1)) == &Tile::Wall;
-        let d = state.map.get_tile(pos + ivec2(0, 1)) == &Tile::Wall;
-
-        let c = match (l, r, u, d) {
-            (true, true, true, true) => DOUBLE_WALL.intersection,
-            (true, true, true, false) => DOUBLE_WALL.t_top,
-            (true, true, false, true) => DOUBLE_WALL.t_bottom,
-            (true, true, false, false) => DOUBLE_WALL.horizontal,
-            (true, false, true, true) => DOUBLE_WALL.t_left,
-            (true, false, true, false) => DOUBLE_WALL.bottom_right,
-            (true, false, false, true) => DOUBLE_WALL.top_right,
-            (true, false, false, false) => DOUBLE_WALL.horizontal,
-            (false, true, true, true) => DOUBLE_WALL.t_right,
-            (false, true, true, false) => DOUBLE_WALL.bottom_left,
-            (false, true, false, true) => DOUBLE_WALL.top_left,
-            (false, true, false, false) => DOUBLE_WALL.horizontal,
-            (false, false, true, true) => DOUBLE_WALL.vertical,
-            (false, false, true, false) => DOUBLE_WALL.vertical,
-            (false, false, false, true) => DOUBLE_WALL.vertical,
-            (false, false, false, false) => '#',
-        };
-        self.set_char(
-            pos,
-            c,
-            Style::default()
-                .bg(Color::Rgb(100, 100, 100))
-                .fg(Color::Rgb(255, 255, 255)),
-        );
     }
 
     fn buffer_pos(&self, pos: IVec2) -> Option<U16Vec2> {
